@@ -7,22 +7,28 @@ const SETTINGS = {
   eventName: "Theresa & Precious",
   maximumFileSizeMB: 25,
   maximumFilesPerUpload: 20,
-  galleryRefreshTime: 60000
+  maximumConcurrentUploads: 2,
+  galleryRefreshTime: 60000,
+  uploadConfirmationTimeout: 90000,
+  uploadStatusPollInterval: 900,
+  imageCompressionThresholdMB: 1.2,
+  imageMaximumDimension: 1920,
+  imageQuality: 0.82
 };
 
 const state = {
   selectedFiles: [],
   selectedFileUrls: [],
   galleryTimer: null,
-  toastTimer: null
+  galleryRequestActive: false,
+  toastTimer: null,
+  qrAttempts: 0,
+  uploading: false
 };
 
 const elements = {};
 
-document.addEventListener(
-  "DOMContentLoaded",
-  startWebsite
-);
+document.addEventListener("DOMContentLoaded", startWebsite);
 
 function startWebsite() {
   collectElements();
@@ -31,15 +37,8 @@ function startWebsite() {
   createQrCode();
   checkHeroImage();
 
-  window.addEventListener(
-    "hashchange",
-    showCorrectPage
-  );
-
-  document.addEventListener(
-    "keydown",
-    handleEscapeKey
-  );
+  window.addEventListener("hashchange", showCorrectPage);
+  document.addEventListener("keydown", handleEscapeKey);
 }
 
 function collectElements() {
@@ -74,8 +73,15 @@ function collectElements() {
     "chooseAnotherFile",
     "confirmUpload",
     "successDialog",
+    "successTitle",
     "successHome",
     "successGallery",
+    "memoryViewer",
+    "closeMemoryViewer",
+    "memoryViewerMedia",
+    "memoryViewerGuest",
+    "memoryViewerDate",
+    "downloadMemory",
     "openQrCode",
     "qrDialog",
     "closeQrDialog",
@@ -83,26 +89,22 @@ function collectElements() {
     "qrWebsiteAddress",
     "shareWebsite",
     "toast",
-"heroImage",
-"memoryViewer",
-"closeMemoryViewer",
-"memoryViewerMedia",
-"memoryViewerGuest",
-"memoryViewerDate",
-"downloadMemory"
+    "heroImage"
   ];
 
   ids.forEach((id) => {
-    elements[id] =
-      document.getElementById(id);
+    const element = document.getElementById(id);
+
+    if (!element) {
+      throw new Error(`Missing required page element: ${id}`);
+    }
+
+    elements[id] = element;
   });
 
-  elements.shareOptions =
-    Array.from(
-      document.querySelectorAll(
-        ".share-option[data-input]"
-      )
-    );
+  elements.shareOptions = Array.from(
+    document.querySelectorAll(".share-option[data-input]")
+  );
 
   elements.fileInputs = [
     elements.takePhotoInput,
@@ -154,19 +156,18 @@ function connectButtons() {
   );
 
   elements.shareOptions.forEach((button) => {
-    button.addEventListener(
-      "click",
-      () => {
-        const inputId =
-          button.dataset.input;
+    button.addEventListener("click", () => {
+      const input =
+        document.getElementById(
+          button.dataset.input
+        );
 
-        const input =
-          document.getElementById(inputId);
+      closeShareSheet();
 
-        closeShareSheet();
+      window.setTimeout(() => {
         input.click();
-      }
-    );
+      }, 80);
+    });
   });
 
   elements.fileInputs.forEach((input) => {
@@ -207,6 +208,23 @@ function connectButtons() {
     }
   );
 
+  elements.closeMemoryViewer.addEventListener(
+    "click",
+    closeMemoryViewer
+  );
+
+  elements.memoryViewer.addEventListener(
+    "click",
+    (event) => {
+      if (
+        event.target ===
+        elements.memoryViewer
+      ) {
+        closeMemoryViewer();
+      }
+    }
+  );
+
   elements.openQrCode.addEventListener(
     "click",
     openQrDialog
@@ -221,28 +239,14 @@ function connectButtons() {
     "click",
     shareWebsiteLink
   );
-elements.closeMemoryViewer.addEventListener(
-  "click",
-  closeMemoryViewer
-);
 
-elements.memoryViewer.addEventListener(
-  "click",
-  (event) => {
-    if (
-      event.target ===
-      elements.memoryViewer
-    ) {
-      closeMemoryViewer();
-    }
-  }
-);
   elements.uploadDialog.addEventListener(
     "click",
     (event) => {
       if (
         event.target ===
-        elements.uploadDialog
+          elements.uploadDialog &&
+        !state.uploading
       ) {
         closeUploadDialog();
       }
@@ -298,12 +302,14 @@ function openGalleryPage() {
 }
 
 function openHomePage() {
-  history.pushState(
-    null,
-    "",
-    window.location.pathname +
-      window.location.search
-  );
+  if (window.location.hash) {
+    history.pushState(
+      null,
+      "",
+      window.location.pathname +
+        window.location.search
+    );
+  }
 
   showHomeView();
 }
@@ -312,7 +318,10 @@ function showGalleryView() {
   elements.homeView.hidden = true;
   elements.galleryView.hidden = false;
 
-  window.scrollTo(0, 0);
+  window.scrollTo({
+    top: 0,
+    behavior: "auto"
+  });
 
   loadGallery(false);
   beginGalleryRefresh();
@@ -324,16 +333,15 @@ function showHomeView() {
   elements.galleryView.hidden = true;
   elements.homeView.hidden = false;
 
-  window.scrollTo(0, 0);
+  window.scrollTo({
+    top: 0,
+    behavior: "auto"
+  });
 }
 
 function openShareSheet() {
   elements.backdrop.hidden = false;
   elements.shareSheet.hidden = false;
-
-  document.body.classList.add(
-    "modal-open"
-  );
 
   requestAnimationFrame(() => {
     elements.backdrop.classList.add(
@@ -343,6 +351,8 @@ function openShareSheet() {
     elements.shareSheet.classList.add(
       "visible"
     );
+
+    syncBodyModalState();
   });
 }
 
@@ -358,18 +368,14 @@ function closeShareSheet() {
   window.setTimeout(() => {
     elements.backdrop.hidden = true;
     elements.shareSheet.hidden = true;
-
-    document.body.classList.remove(
-      "modal-open"
-    );
+    syncBodyModalState();
   }, 280);
 }
 
 function handleSelectedFiles(event) {
-  const files =
-    Array.from(
-      event.target.files || []
-    );
+  const files = Array.from(
+    event.target.files || []
+  );
 
   event.target.value = "";
 
@@ -382,9 +388,7 @@ function handleSelectedFiles(event) {
     SETTINGS.maximumFilesPerUpload
   ) {
     showToast(
-      "Please select no more than " +
-        SETTINGS.maximumFilesPerUpload +
-        " files at once."
+      `Please select no more than ${SETTINGS.maximumFilesPerUpload} files at once.`
     );
 
     return;
@@ -394,10 +398,7 @@ function handleSelectedFiles(event) {
   const rejectedFiles = [];
 
   files.forEach((file) => {
-    const validationMessage =
-      validateFile(file);
-
-    if (validationMessage) {
+    if (validateFile(file)) {
       rejectedFiles.push(file.name);
     } else {
       validFiles.push(file);
@@ -406,9 +407,7 @@ function handleSelectedFiles(event) {
 
   if (!validFiles.length) {
     showToast(
-      "None of the selected files could be added. Use photos or videos smaller than " +
-        SETTINGS.maximumFileSizeMB +
-        " MB each."
+      `None of the selected files could be added. Use photos or videos smaller than ${SETTINGS.maximumFileSizeMB} MB each.`
     );
 
     return;
@@ -424,25 +423,21 @@ function handleSelectedFiles(event) {
     );
 
   showFilesPreview();
-
   openUploadDialog();
 
   if (rejectedFiles.length) {
     showToast(
-      rejectedFiles.length +
-        " file(s) were skipped because they were unsupported or too large."
+      `${rejectedFiles.length} file(s) were skipped because they were unsupported or too large.`
     );
   }
 }
 
 function validateFile(file) {
-  const isPhoto =
-    file.type.startsWith("image/");
-
-  const isVideo =
+  const supported =
+    file.type.startsWith("image/") ||
     file.type.startsWith("video/");
 
-  if (!isPhoto && !isVideo) {
+  if (!supported) {
     return "Unsupported file";
   }
 
@@ -451,11 +446,9 @@ function validateFile(file) {
     1024 *
     1024;
 
-  if (file.size > maximumBytes) {
-    return "File too large";
-  }
-
-  return "";
+  return file.size > maximumBytes
+    ? "File too large"
+    : "";
 }
 
 function showFilesPreview() {
@@ -475,16 +468,15 @@ function showFilesPreview() {
       previewItem.className =
         "multi-preview-item";
 
-      const fileUrl =
-        state.selectedFileUrls[index];
-
       if (
         file.type.startsWith("image/")
       ) {
         const image =
           document.createElement("img");
 
-        image.src = fileUrl;
+        image.src =
+          state.selectedFileUrls[index];
+
         image.alt =
           "Selected wedding memory";
 
@@ -493,7 +485,9 @@ function showFilesPreview() {
         const video =
           document.createElement("video");
 
-        video.src = fileUrl;
+        video.src =
+          state.selectedFileUrls[index];
+
         video.controls = true;
         video.playsInline = true;
         video.preload = "metadata";
@@ -511,7 +505,9 @@ function showFilesPreview() {
         String(index + 1);
 
       previewItem.appendChild(number);
-      previewGrid.appendChild(previewItem);
+      previewGrid.appendChild(
+        previewItem
+      );
     }
   );
 
@@ -532,62 +528,54 @@ function showFilesPreview() {
       : "files";
 
   elements.selectedFileDetails.textContent =
-    state.selectedFiles.length +
-    " " +
-    fileWord +
-    " selected · " +
-    formatFileSize(totalSize);
+    `${state.selectedFiles.length} ${fileWord} selected · ${formatFileSize(totalSize)}`;
 
   elements.confirmUpload.textContent =
     state.selectedFiles.length === 1
       ? "Add to the Album"
-      : "Add " +
-        state.selectedFiles.length +
-        " Memories";
+      : `Add ${state.selectedFiles.length} Memories`;
 }
 
 function openUploadDialog() {
-  elements.uploadProgress.hidden = true;
-  elements.uploadActions.hidden = false;
-  elements.confirmUpload.disabled = false;
+  resetUploadProgress();
 
-  elements.progressBar.style.width =
-    "0%";
+  elements.uploadDialog.hidden =
+    false;
 
-  elements.progressText.textContent =
-    "Preparing your memories...";
-
-  elements.uploadDialog.hidden = false;
-
-  document.body.classList.add(
-    "modal-open"
-  );
+  syncBodyModalState();
 }
 
 function closeUploadDialog() {
+  if (state.uploading) {
+    return;
+  }
+
   elements.uploadDialog.hidden = true;
-
-  document.body.classList.remove(
-    "modal-open"
-  );
-
   elements.guestName.value = "";
 
   clearSelectedFiles();
+  resetUploadProgress();
+  syncBodyModalState();
 }
 
 function chooseAnotherFile() {
+  if (state.uploading) {
+    return;
+  }
+
   elements.uploadDialog.hidden = true;
 
-  document.body.classList.remove(
-    "modal-open"
-  );
-
   clearSelectedFiles();
+  resetUploadProgress();
+  syncBodyModalState();
   openShareSheet();
 }
 
 async function uploadMemories() {
+  if (state.uploading) {
+    return;
+  }
+
   if (!state.selectedFiles.length) {
     showToast(
       "Please choose at least one photo or video."
@@ -596,12 +584,7 @@ async function uploadMemories() {
     return;
   }
 
-  if (
-    !GOOGLE_APPS_SCRIPT_URL ||
-    !GOOGLE_APPS_SCRIPT_URL.endsWith(
-      "/exec"
-    )
-  ) {
+  if (!isValidWebAppUrl()) {
     showToast(
       "The Google Drive upload address has not been added correctly."
     );
@@ -609,105 +592,201 @@ async function uploadMemories() {
     return;
   }
 
+  state.uploading = true;
   setUploadingState(true);
 
-  const totalFiles =
-    state.selectedFiles.length;
+  const guestName =
+    elements.guestName.value.trim();
 
-  let successfulUploads = 0;
-  const failedFiles = [];
+  const files = [
+    ...state.selectedFiles
+  ];
 
-  for (
-    let index = 0;
-    index < totalFiles;
-    index += 1
-  ) {
-    const file =
-      state.selectedFiles[index];
+  const results =
+    new Array(files.length);
 
-    const startingPercent =
-      Math.round(
-        (index / totalFiles) * 100
-      );
-
-    updateProgress(
-      startingPercent,
-      "Uploading " +
-        (index + 1) +
-        " of " +
-        totalFiles +
-        ": " +
-        file.name
+  const workerCount =
+    Math.min(
+      SETTINGS.maximumConcurrentUploads,
+      files.length
     );
 
-    try {
-      await uploadOneFile(file);
+  let nextIndex = 0;
+  let completed = 0;
 
-      successfulUploads += 1;
-    } catch (error) {
-      console.error(
-        "Upload failed:",
-        file.name,
-        error
+  async function uploadWorker() {
+    while (
+      nextIndex < files.length
+    ) {
+      const index = nextIndex;
+
+      nextIndex += 1;
+
+      const file = files[index];
+
+      updateProgress(
+        Math.round(
+          (completed / files.length) *
+            100
+        ),
+        `Preparing ${index + 1} of ${files.length}: ${file.name}`
       );
 
-      failedFiles.push(file.name);
+      try {
+        results[index] =
+          await uploadOneFile(
+            file,
+            guestName,
+            index,
+            files.length
+          );
+      } catch (error) {
+        console.error(
+          "Upload failed:",
+          file.name,
+          error
+        );
+
+        results[index] = {
+          success: false,
+          fileName: file.name,
+          message:
+            error.message ||
+            "Upload failed"
+        };
+      }
+
+      completed += 1;
+
+      updateProgress(
+        Math.round(
+          (completed / files.length) *
+            100
+        ),
+        completed === files.length
+          ? "Finishing your upload..."
+          : `${completed} of ${files.length} memories uploaded`
+      );
     }
   }
 
-  updateProgress(
-    100,
-    "Upload complete."
-  );
-
-  await wait(500);
-
-  elements.uploadDialog.hidden = true;
-
-  clearSelectedFiles();
-  setUploadingState(false);
-
-  if (!successfulUploads) {
-    document.body.classList.remove(
-      "modal-open"
+  try {
+    await Promise.all(
+      Array.from(
+        {
+          length: workerCount
+        },
+        () => uploadWorker()
+      )
     );
+
+    const successfulUploads =
+      results.filter(
+        (result) =>
+          result?.success
+      );
+
+    const failedUploads =
+      results.filter(
+        (result) =>
+          !result?.success
+      );
+
+    if (!successfulUploads.length) {
+      throw new Error(
+        failedUploads[0]?.message ||
+          "The files could not be uploaded. Please check the connection and try again."
+      );
+    }
+
+    updateProgress(
+      100,
+      "Your memories have been added to the album."
+    );
+
+    await wait(350);
+
+    elements.uploadDialog.hidden =
+      true;
+
+    clearSelectedFiles();
+    resetUploadProgress();
+
+    elements.successTitle.textContent =
+      successfulUploads.length === 1
+        ? "Thank you for sharing this moment"
+        : `Thank you for sharing ${successfulUploads.length} memories`;
+
+    elements.successDialog.hidden =
+      false;
+
+    syncBodyModalState();
+
+    if (failedUploads.length) {
+      showToast(
+        `${successfulUploads.length} file(s) uploaded. ${failedUploads.length} file(s) could not be uploaded.`
+      );
+    }
+  } catch (error) {
+    console.error(error);
 
     showToast(
-      "The files could not be uploaded. Please check the connection and try again."
+      error.message ||
+        "The upload did not complete. Please try again."
     );
-
-    return;
-  }
-
-  elements.successDialog.hidden = false;
-
-  document.body.classList.add(
-    "modal-open"
-  );
-
-  if (failedFiles.length) {
-    showToast(
-      successfulUploads +
-        " file(s) uploaded. " +
-        failedFiles.length +
-        " file(s) failed."
-    );
+  } finally {
+    state.uploading = false;
+    setUploadingState(false);
   }
 }
 
-async function uploadOneFile(file) {
-  const base64File =
-    await convertFileToBase64(file);
+async function uploadOneFile(
+  file,
+  guestName,
+  index,
+  totalFiles
+) {
+  const preparedFile =
+    file.type.startsWith("image/")
+      ? await compressImageForUpload(
+          file
+        )
+      : file;
+
+  updateProgress(
+    Math.max(
+      3,
+      Math.round(
+        (index / totalFiles) *
+          100
+      )
+    ),
+    preparedFile !== file
+      ? `Optimising ${index + 1} of ${totalFiles}: ${file.name}`
+      : `Preparing ${index + 1} of ${totalFiles}: ${file.name}`
+  );
+
+  const requestId =
+    createRequestId();
 
   const uploadData = {
     action: "upload",
-    eventName: SETTINGS.eventName,
-    guestName:
-      elements.guestName.value.trim(),
+    requestId,
+    eventName:
+      SETTINGS.eventName,
+    guestName,
     fileName:
-      createSafeFileName(file.name),
-    mimeType: file.type,
-    base64: base64File,
+      createSafeFileName(
+        preparedFile.name ||
+          file.name
+      ),
+    mimeType:
+      preparedFile.type ||
+      file.type,
+    base64:
+      await convertFileToBase64(
+        preparedFile
+      ),
     uploadedAt:
       new Date().toISOString()
   };
@@ -721,14 +800,88 @@ async function uploadOneFile(file) {
         "Content-Type":
           "text/plain;charset=utf-8"
       },
-      body: JSON.stringify(uploadData)
+      body:
+        JSON.stringify(uploadData)
     }
   );
 
-  await wait(350);
+  const confirmation =
+    await waitForUploadConfirmation(
+      requestId
+    );
+
+  if (!confirmation.success) {
+    throw new Error(
+      confirmation.message ||
+        "Google Drive did not save the file."
+    );
+  }
+
+  return confirmation;
 }
 
-function setUploadingState(isUploading) {
+async function waitForUploadConfirmation(
+  requestId
+) {
+  const startedAt = Date.now();
+
+  while (
+    Date.now() - startedAt <
+    SETTINGS.uploadConfirmationTimeout
+  ) {
+    try {
+      const result =
+        await requestJsonp({
+          action: "status",
+          requestId,
+          t: Date.now()
+        });
+
+      if (
+        result.status ===
+        "success"
+      ) {
+        return {
+          success: true,
+          file:
+            result.file || null,
+          message:
+            result.message ||
+            "Upload complete"
+        };
+      }
+
+      if (
+        result.status ===
+        "error"
+      ) {
+        return {
+          success: false,
+          message:
+            result.message ||
+            "The upload failed."
+        };
+      }
+    } catch (error) {
+      console.warn(
+        "Upload status check failed. Retrying...",
+        error
+      );
+    }
+
+    await wait(
+      SETTINGS.uploadStatusPollInterval
+    );
+  }
+
+  throw new Error(
+    "The upload took too long to confirm. Check Google Drive before trying again."
+  );
+}
+
+function setUploadingState(
+  isUploading
+) {
   elements.uploadProgress.hidden =
     !isUploading;
 
@@ -738,57 +891,112 @@ function setUploadingState(isUploading) {
   elements.confirmUpload.disabled =
     isUploading;
 
+  elements.closeUploadDialog.disabled =
+    isUploading;
+
   if (isUploading) {
     updateProgress(
-      3,
+      2,
       "Preparing your memories..."
     );
   }
 }
 
-function loadGallery(
+function resetUploadProgress() {
+  elements.uploadProgress.hidden =
+    true;
+
+  elements.uploadActions.hidden =
+    false;
+
+  elements.confirmUpload.disabled =
+    false;
+
+  elements.closeUploadDialog.disabled =
+    false;
+
+  elements.progressBar.style.width =
+    "0%";
+
+  elements.progressText.textContent =
+    "Preparing your memories...";
+}
+
+async function loadGallery(
   showRefreshMessage
 ) {
+  if (
+    state.galleryRequestActive ||
+    !isValidWebAppUrl()
+  ) {
+    return;
+  }
+
+  state.galleryRequestActive = true;
+
   elements.emptyGallery.hidden = true;
+  elements.galleryLoading.hidden = false;
 
   if (showRefreshMessage) {
     showToast(
-      "Refreshing today's memories..."
+      "Refreshing the wedding memories..."
     );
   }
 
-  elements.galleryLoading.hidden = false;
+  try {
+    const result =
+      await requestJsonp({
+        action: "list",
+        t: Date.now()
+      });
 
-  loadGalleryWithJsonp()
-    .then((memories) => {
-      renderGallery(memories);
-    })
-    .catch((error) => {
-      console.error(error);
-
-      elements.galleryGrid.replaceChildren();
-
-      elements.emptyGallery.hidden = false;
-
-      showToast(
-        error.message ||
-          "The gallery could not be loaded."
+    if (
+      !result.success ||
+      !Array.isArray(result.files)
+    ) {
+      throw new Error(
+        result.message ||
+          "The gallery returned an invalid response."
       );
-    })
-    .finally(() => {
-      elements.galleryLoading.hidden = true;
-    });
+    }
+
+    renderGallery(result.files);
+  } catch (error) {
+    console.error(error);
+
+    elements.galleryGrid.replaceChildren();
+
+    elements.emptyGallery.hidden =
+      false;
+
+    showToast(
+      error.message ||
+        "The gallery could not be loaded."
+    );
+  } finally {
+    elements.galleryLoading.hidden =
+      true;
+
+    state.galleryRequestActive =
+      false;
+  }
 }
 
-function loadGalleryWithJsonp() {
+function requestJsonp(
+  parameters,
+  timeoutMs = 15000
+) {
   return new Promise(
     (resolve, reject) => {
       const callbackName =
-        "weddingGalleryCallback_" +
-        Date.now();
+        `weddingCallback_${Date.now()}_${Math.random()
+          .toString(36)
+          .slice(2)}`;
 
       const script =
-        document.createElement("script");
+        document.createElement(
+          "script"
+        );
 
       const timeout =
         window.setTimeout(() => {
@@ -796,13 +1004,15 @@ function loadGalleryWithJsonp() {
 
           reject(
             new Error(
-              "The wedding album took too long to load."
+              "The request took too long to complete."
             )
           );
-        }, 15000);
+        }, timeoutMs);
 
       function cleanup() {
-        window.clearTimeout(timeout);
+        window.clearTimeout(
+          timeout
+        );
 
         if (script.parentNode) {
           script.parentNode.removeChild(
@@ -814,58 +1024,33 @@ function loadGalleryWithJsonp() {
       }
 
       window[callbackName] =
-        function (result) {
+        (result) => {
           cleanup();
-
-          if (
-            !result ||
-            !result.success ||
-            !Array.isArray(result.files)
-          ) {
-            reject(
-              new Error(
-                result &&
-                result.message
-                  ? result.message
-                  : "The gallery returned an invalid response."
-              )
-            );
-
-            return;
-          }
-
-          resolve(result.files);
+          resolve(result || {});
         };
 
-      const separator =
-        GOOGLE_APPS_SCRIPT_URL.includes(
-          "?"
-        )
-          ? "&"
-          : "?";
+      const search =
+        new URLSearchParams({
+          ...parameters,
+          callback: callbackName
+        });
 
       script.src =
-        GOOGLE_APPS_SCRIPT_URL +
-        separator +
-        "action=list" +
-        "&callback=" +
-        encodeURIComponent(
-          callbackName
-        ) +
-        "&t=" +
-        Date.now();
+        `${GOOGLE_APPS_SCRIPT_URL}?${search.toString()}`;
 
       script.onerror = () => {
         cleanup();
 
         reject(
           new Error(
-            "The wedding gallery could not connect to Google Drive."
+            "The website could not connect to Google Drive."
           )
         );
       };
 
-      document.body.appendChild(script);
+      document.body.appendChild(
+        script
+      );
     }
   );
 }
@@ -874,18 +1059,30 @@ function renderGallery(memories) {
   elements.galleryGrid.replaceChildren();
 
   if (!memories.length) {
-    elements.emptyGallery.hidden = false;
+    elements.emptyGallery.hidden =
+      false;
+
     return;
   }
 
-  elements.emptyGallery.hidden = true;
+  elements.emptyGallery.hidden =
+    true;
 
   memories.forEach((memory) => {
     const card =
-      document.createElement("button");
+      document.createElement(
+        "button"
+      );
 
-    card.type = "button";
-    card.className = "memory-card";
+    const mediaBox =
+      document.createElement(
+        "div"
+      );
+
+    const thumbnail =
+      document.createElement(
+        "img"
+      );
 
     const guestName =
       memory.guestName ||
@@ -896,20 +1093,19 @@ function renderGallery(memories) {
         memory.mimeType || ""
       ).startsWith("video/");
 
+    card.type = "button";
+    card.className =
+      "memory-card";
+
     card.setAttribute(
       "aria-label",
       isVideo
-        ? "Open video shared by " + guestName
-        : "Open photo shared by " + guestName
+        ? `Open video shared by ${guestName}`
+        : `Open photo shared by ${guestName}`
     );
 
-    const mediaBox =
-      document.createElement("div");
-
-    mediaBox.className = "memory-media";
-
-    const thumbnail =
-      document.createElement("img");
+    mediaBox.className =
+      "memory-media";
 
     thumbnail.src =
       memory.thumbnailUrl ||
@@ -918,38 +1114,54 @@ function renderGallery(memories) {
 
     thumbnail.alt =
       isVideo
-        ? "Wedding video shared by " + guestName
-        : "Wedding photo shared by " + guestName;
+        ? `Wedding video shared by ${guestName}`
+        : `Wedding photo shared by ${guestName}`;
 
-    thumbnail.loading = "lazy";
+    thumbnail.loading =
+      "lazy";
 
-    mediaBox.appendChild(thumbnail);
+    thumbnail.decoding =
+      "async";
+
+    mediaBox.appendChild(
+      thumbnail
+    );
 
     if (isVideo) {
       const videoBadge =
-        document.createElement("span");
+        document.createElement(
+          "span"
+        );
 
-      videoBadge.className = "video-badge";
+      videoBadge.className =
+        "video-badge";
+
       videoBadge.setAttribute(
         "aria-hidden",
         "true"
       );
 
-      videoBadge.textContent = "▶";
+      videoBadge.textContent =
+        "▶";
 
-      mediaBox.appendChild(videoBadge);
+      mediaBox.appendChild(
+        videoBadge
+      );
     }
 
     card.appendChild(mediaBox);
 
     card.addEventListener(
       "click",
-      () => {
-        openMemoryViewer(memory);
-      }
+      () =>
+        openMemoryViewer(
+          memory
+        )
     );
 
-    elements.galleryGrid.appendChild(card);
+    elements.galleryGrid.appendChild(
+      card
+    );
   });
 }
 
@@ -963,7 +1175,9 @@ function openMemoryViewer(memory) {
 
   if (isVideo) {
     const frame =
-      document.createElement("iframe");
+      document.createElement(
+        "iframe"
+      );
 
     frame.src =
       memory.embedUrl ||
@@ -971,14 +1185,13 @@ function openMemoryViewer(memory) {
       "";
 
     frame.title =
-      "Wedding video shared by " +
-      (
-        memory.guestName ||
-        "a guest"
-      );
+      `Wedding video shared by ${memory.guestName || "a guest"}`;
 
     frame.allow =
       "autoplay; fullscreen";
+
+    frame.loading =
+      "eager";
 
     frame.setAttribute(
       "allowfullscreen",
@@ -990,7 +1203,9 @@ function openMemoryViewer(memory) {
     );
   } else {
     const image =
-      document.createElement("img");
+      document.createElement(
+        "img"
+      );
 
     let fullImageUrl =
       memory.thumbnailUrl ||
@@ -1006,11 +1221,7 @@ function openMemoryViewer(memory) {
     image.src = fullImageUrl;
 
     image.alt =
-      "Wedding memory shared by " +
-      (
-        memory.guestName ||
-        "a guest"
-      );
+      `Wedding memory shared by ${memory.guestName || "a guest"}`;
 
     elements.memoryViewerMedia.appendChild(
       image
@@ -1048,47 +1259,46 @@ function openMemoryViewer(memory) {
     );
   }
 
-  elements.memoryViewer.hidden = false;
+  elements.memoryViewer.hidden =
+    false;
 
-  document.body.classList.add(
-    "modal-open"
-  );
+  syncBodyModalState();
 }
 
 function closeMemoryViewer() {
-  elements.memoryViewer.hidden = true;
+  elements.memoryViewer.hidden =
+    true;
 
   elements.memoryViewerMedia.replaceChildren();
 
-  elements.downloadMemory.href = "#";
+  elements.downloadMemory.href =
+    "#";
 
-  document.body.classList.remove(
-    "modal-open"
-  );
-} {
-  elements.successDialog.hidden = true;
+  syncBodyModalState();
+}
 
-  document.body.classList.remove(
-    "modal-open"
-  );
+function closeSuccessDialog() {
+  elements.successDialog.hidden =
+    true;
 
-  elements.guestName.value = "";
+  elements.guestName.value =
+    "";
+
+  syncBodyModalState();
 }
 
 function openQrDialog() {
-  elements.qrDialog.hidden = false;
+  elements.qrDialog.hidden =
+    false;
 
-  document.body.classList.add(
-    "modal-open"
-  );
+  syncBodyModalState();
 }
 
 function closeQrDialog() {
-  elements.qrDialog.hidden = true;
+  elements.qrDialog.hidden =
+    true;
 
-  document.body.classList.remove(
-    "modal-open"
-  );
+  syncBodyModalState();
 }
 
 function createQrCode() {
@@ -1099,15 +1309,24 @@ function createQrCode() {
     websiteUrl;
 
   if (
-    typeof QRCode === "undefined"
+    typeof QRCode ===
+    "undefined"
   ) {
-    window.setTimeout(
-      createQrCode,
-      300
-    );
+    state.qrAttempts += 1;
+
+    if (
+      state.qrAttempts < 20
+    ) {
+      window.setTimeout(
+        createQrCode,
+        300
+      );
+    }
 
     return;
   }
+
+  state.qrAttempts = 0;
 
   elements.qrCode.replaceChildren();
 
@@ -1134,8 +1353,10 @@ async function shareWebsiteLink() {
       await navigator.share({
         title:
           "Theresa & Precious Wedding Memories",
+
         text:
           "Share and view memories from Theresa and Precious' wedding.",
+
         url: websiteUrl
       });
 
@@ -1151,11 +1372,11 @@ async function shareWebsiteLink() {
     );
   } catch (error) {
     if (
-      error.name !== "AbortError"
+      error.name !==
+      "AbortError"
     ) {
       showToast(
-        "Copy this address: " +
-          websiteUrl
+        `Copy this address: ${websiteUrl}`
       );
     }
   }
@@ -1182,20 +1403,27 @@ function checkHeroImage() {
 }
 
 function handleEscapeKey(event) {
-  if (event.key !== "Escape") {
+  if (
+    event.key !== "Escape"
+  ) {
     return;
   }
 
-  if (!elements.memoryViewer.hidden) {
-  closeMemoryViewer();
-} else if (!elements.qrDialog.hidden) {
-  closeQrDialog();
+  if (
+    !elements.memoryViewer.hidden
+  ) {
+    closeMemoryViewer();
+  } else if (
+    !elements.qrDialog.hidden
+  ) {
+    closeQrDialog();
   } else if (
     !elements.successDialog.hidden
   ) {
     closeSuccessDialog();
   } else if (
-    !elements.uploadDialog.hidden
+    !elements.uploadDialog.hidden &&
+    !state.uploading
   ) {
     closeUploadDialog();
   } else if (
@@ -1203,6 +1431,20 @@ function handleEscapeKey(event) {
   ) {
     closeShareSheet();
   }
+}
+
+function syncBodyModalState() {
+  const modalIsOpen =
+    !elements.shareSheet.hidden ||
+    !elements.uploadDialog.hidden ||
+    !elements.successDialog.hidden ||
+    !elements.memoryViewer.hidden ||
+    !elements.qrDialog.hidden;
+
+  document.body.classList.toggle(
+    "modal-open",
+    modalIsOpen
+  );
 }
 
 function beginGalleryRefresh() {
@@ -1222,20 +1464,21 @@ function beginGalleryRefresh() {
 }
 
 function stopGalleryRefresh() {
-  if (state.galleryTimer) {
-    window.clearInterval(
-      state.galleryTimer
-    );
-
-    state.galleryTimer = null;
+  if (!state.galleryTimer) {
+    return;
   }
+
+  window.clearInterval(
+    state.galleryTimer
+  );
+
+  state.galleryTimer = null;
 }
 
 function clearSelectedFiles() {
   state.selectedFileUrls.forEach(
-    (url) => {
-      URL.revokeObjectURL(url);
-    }
+    (url) =>
+      URL.revokeObjectURL(url)
   );
 
   state.selectedFiles = [];
@@ -1250,6 +1493,156 @@ function clearSelectedFiles() {
     "Add to the Album";
 }
 
+function compressImageForUpload(file) {
+  const thresholdBytes =
+    SETTINGS.imageCompressionThresholdMB *
+    1024 *
+    1024;
+
+  const cannotCompress =
+    !file.type.startsWith("image/") ||
+    file.type === "image/gif" ||
+    file.type === "image/svg+xml" ||
+    file.size < thresholdBytes;
+
+  if (cannotCompress) {
+    return Promise.resolve(file);
+  }
+
+  return new Promise((resolve) => {
+    const image =
+      new Image();
+
+    const imageUrl =
+      URL.createObjectURL(file);
+
+    function finish(result) {
+      URL.revokeObjectURL(
+        imageUrl
+      );
+
+      resolve(result);
+    }
+
+    image.onload = () => {
+      const largestDimension =
+        Math.max(
+          image.naturalWidth,
+          image.naturalHeight
+        );
+
+      const scale =
+        Math.min(
+          1,
+          SETTINGS.imageMaximumDimension /
+            largestDimension
+        );
+
+      const width =
+        Math.max(
+          1,
+          Math.round(
+            image.naturalWidth *
+              scale
+          )
+        );
+
+      const height =
+        Math.max(
+          1,
+          Math.round(
+            image.naturalHeight *
+              scale
+          )
+        );
+
+      const canvas =
+        document.createElement(
+          "canvas"
+        );
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const context =
+        canvas.getContext("2d");
+
+      if (!context) {
+        finish(file);
+        return;
+      }
+
+      context.fillStyle =
+        "#ffffff";
+
+      context.fillRect(
+        0,
+        0,
+        width,
+        height
+      );
+
+      context.imageSmoothingEnabled =
+        true;
+
+      context.imageSmoothingQuality =
+        "high";
+
+      context.drawImage(
+        image,
+        0,
+        0,
+        width,
+        height
+      );
+
+      canvas.toBlob(
+        (blob) => {
+          if (
+            !blob ||
+            blob.size >= file.size
+          ) {
+            finish(file);
+            return;
+          }
+
+          finish(
+            new File(
+              [blob],
+              createCompressedFileName(
+                file.name
+              ),
+              {
+                type:
+                  "image/jpeg",
+
+                lastModified:
+                  Date.now()
+              }
+            )
+          );
+        },
+        "image/jpeg",
+        SETTINGS.imageQuality
+      );
+    };
+
+    image.onerror = () =>
+      finish(file);
+
+    image.src = imageUrl;
+  });
+}
+
+function createCompressedFileName(
+  originalName
+) {
+  return `${originalName.replace(
+    /\.[^/.]+$/,
+    ""
+  )}-optimised.jpg`;
+}
+
 function convertFileToBase64(file) {
   return new Promise(
     (resolve, reject) => {
@@ -1262,12 +1655,16 @@ function convertFileToBase64(file) {
             reader.result || ""
           );
 
-        const base64Value =
-          result.includes(",")
-            ? result.split(",")[1]
-            : result;
+        const commaIndex =
+          result.indexOf(",");
 
-        resolve(base64Value);
+        resolve(
+          commaIndex >= 0
+            ? result.slice(
+                commaIndex + 1
+              )
+            : result
+        );
       };
 
       reader.onerror = () => {
@@ -1283,6 +1680,20 @@ function convertFileToBase64(file) {
   );
 }
 
+function createRequestId() {
+  if (
+    window.crypto &&
+    typeof window.crypto.randomUUID ===
+      "function"
+  ) {
+    return window.crypto.randomUUID();
+  }
+
+  return `upload-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2)}`;
+}
+
 function createSafeFileName(
   originalName
 ) {
@@ -1292,48 +1703,56 @@ function createSafeFileName(
       .replace(/[:.]/g, "-");
 
   const cleanName =
-    originalName.replace(
+    String(originalName).replace(
       /[^a-zA-Z0-9._-]/g,
       "_"
     );
 
-  return time + "_" + cleanName;
+  return `${time}_${cleanName}`;
 }
 
 function updateProgress(
   percent,
   message
 ) {
+  const safePercent =
+    Math.min(
+      100,
+      Math.max(
+        0,
+        Number(percent) || 0
+      )
+    );
+
   elements.progressBar.style.width =
-    percent + "%";
+    `${safePercent}%`;
 
   elements.progressText.textContent =
     message;
 }
 
 function formatFileSize(bytes) {
-  if (bytes < 1024 * 1024) {
-    const kilobytes =
-      Math.max(
-        1,
-        Math.round(bytes / 1024)
-      );
-
-    return kilobytes + " KB";
+  if (
+    bytes <
+    1024 * 1024
+  ) {
+    return `${Math.max(
+      1,
+      Math.round(bytes / 1024)
+    )} KB`;
   }
 
-  const megabytes =
-    (
-      bytes /
-      (1024 * 1024)
-    ).toFixed(1);
-
-  return megabytes + " MB";
+  return `${(
+    bytes /
+    (1024 * 1024)
+  ).toFixed(1)} MB`;
 }
 
-function formatMemoryDate(dateValue) {
+function formatMemoryDate(
+  dateValue
+) {
   if (!dateValue) {
-    return "Today";
+    return "25 July 2026";
   }
 
   const date =
@@ -1344,7 +1763,7 @@ function formatMemoryDate(dateValue) {
       date.getTime()
     )
   ) {
-    return "Today";
+    return "25 July 2026";
   }
 
   return new Intl.DateTimeFormat(
@@ -1352,10 +1771,22 @@ function formatMemoryDate(dateValue) {
     {
       day: "numeric",
       month: "short",
+      year: "numeric",
       hour: "numeric",
       minute: "2-digit"
     }
   ).format(date);
+}
+
+function isValidWebAppUrl() {
+  return (
+    GOOGLE_APPS_SCRIPT_URL.startsWith(
+      "https://script.google.com/"
+    ) &&
+    GOOGLE_APPS_SCRIPT_URL.endsWith(
+      "/exec"
+    )
+  );
 }
 
 function showToast(message) {
@@ -1366,24 +1797,21 @@ function showToast(message) {
   elements.toast.textContent =
     message;
 
-  elements.toast.hidden = false;
+  elements.toast.hidden =
+    false;
 
   state.toastTimer =
-    window.setTimeout(
-      () => {
-        elements.toast.hidden = true;
-      },
-      3800
-    );
+    window.setTimeout(() => {
+      elements.toast.hidden =
+        true;
+    }, 4200);
 }
 
 function wait(milliseconds) {
-  return new Promise(
-    (resolve) => {
-      window.setTimeout(
-        resolve,
-        milliseconds
-      );
-    }
+  return new Promise((resolve) =>
+    window.setTimeout(
+      resolve,
+      milliseconds
+    )
   );
 }

@@ -42,25 +42,29 @@
 
 <body>
   <main>
-    <!-- HOME PAGE -->
+    <!-- HOME -->
 
-    <section id="homeView" class="view">
+    <section
+      id="homeView"
+      class="view"
+    >
       <header class="hero">
-        <!--
-          Upload the wedding photo into the same folder
-          as index.html and name it hero.jpg
-        -->
-
         <img
           id="heroImage"
           src="assets/images/hero.jpg"
           alt="Theresa and Precious"
+          fetchpriority="high"
         >
 
-        <div class="hero-overlay" aria-hidden="true"></div>
+        <div
+          class="hero-overlay"
+          aria-hidden="true"
+        ></div>
 
         <div class="hero-copy">
-          <p class="eyebrow">Our Wedding</p>
+          <p class="eyebrow">
+            Our Wedding
+          </p>
 
           <h1>
             Theresa <span>&amp;</span> Precious
@@ -78,7 +82,10 @@
 
       <section class="welcome-section">
         <div class="content-shell">
-          <span class="gold-star" aria-hidden="true">
+          <span
+            class="gold-star"
+            aria-hidden="true"
+          >
             ✦
           </span>
 
@@ -96,7 +103,10 @@
             class="share-main-button"
             type="button"
           >
-            <span class="camera-icon" aria-hidden="true">
+            <span
+              class="camera-icon"
+              aria-hidden="true"
+            >
               📷
             </span>
 
@@ -110,11 +120,17 @@
             class="gallery-link"
             type="button"
           >
-            <span aria-hidden="true">♡</span>
+            <span aria-hidden="true">
+              ♡
+            </span>
 
-            View Wedding Memories
+            <span>
+              View Wedding Memories
+            </span>
 
-            <span aria-hidden="true">→</span>
+            <span aria-hidden="true">
+              →
+            </span>
           </button>
         </div>
       </section>
@@ -124,13 +140,16 @@
           Theresa &amp; Precious
         </span>
 
-        <button id="openQrCode" type="button">
+        <button
+          id="openQrCode"
+          type="button"
+        >
           Wedding QR Code
         </button>
       </footer>
     </section>
 
-    <!-- GALLERY PAGE -->
+    <!-- GALLERY -->
 
     <section
       id="galleryView"
@@ -142,7 +161,7 @@
           id="closeGallery"
           class="round-button"
           type="button"
-          aria-label="Return to home"
+          aria-label="Return to the wedding homepage"
         >
           ←
         </button>
@@ -161,18 +180,20 @@
           id="refreshGallery"
           class="round-button"
           type="button"
-          aria-label="Refresh gallery"
+          aria-label="Refresh the wedding gallery"
         >
           ↻
         </button>
       </header>
 
       <div class="gallery-intro">
-        <span aria-hidden="true">✦</span>
+        <span aria-hidden="true">
+          ✦
+        </span>
 
         <p>
           A wedding album filled with the moments our guests
-  captured on 25 July 2026.
+          captured on 25 July 2026.
         </p>
       </div>
 
@@ -180,6 +201,7 @@
         id="galleryLoading"
         class="gallery-loading"
         role="status"
+        aria-live="polite"
       >
         <span
           class="spinner"
@@ -201,14 +223,17 @@
         class="empty-gallery"
         hidden
       >
-        <span aria-hidden="true">♡</span>
+        <span aria-hidden="true">
+          ♡
+        </span>
 
         <h2>
           The album is waiting for its first memory
         </h2>
 
         <p>
-          Be the first guest to share a beautiful moment from today.
+          Be the first guest to share a beautiful moment
+          from the celebration.
         </p>
 
         <button
@@ -225,14 +250,16 @@
         class="floating-share-button"
         type="button"
       >
-        <span aria-hidden="true">📷</span>
+        <span aria-hidden="true">
+          📷
+        </span>
 
         Share
       </button>
     </section>
   </main>
 
-  <!-- DARK BACKDROP -->
+  <!-- BACKDROP -->
 
   <div
     id="backdrop"
@@ -274,7 +301,7 @@
         id="closeShareSheet"
         class="round-button"
         type="button"
-        aria-label="Close"
+        aria-label="Close the sharing options"
       >
         ×
       </button>
@@ -300,7 +327,9 @@
           </small>
         </span>
 
-        <span>›</span>
+        <span aria-hidden="true">
+          ›
+        </span>
       </button>
 
       <button
@@ -314,15 +343,17 @@
 
         <span>
           <strong>
-            Upload a Photo
+            Upload Photos
           </strong>
 
           <small>
-            Choose from your gallery
+            Choose one or several photos
           </small>
         </span>
 
-        <span>›</span>
+        <span aria-hidden="true">
+          ›
+        </span>
       </button>
 
       <button
@@ -344,7 +375,9 @@
           </small>
         </span>
 
-        <span>›</span>
+        <span aria-hidden="true">
+          ›
+        </span>
       </button>
 
       <button
@@ -358,20 +391,22 @@
 
         <span>
           <strong>
-            Upload a Video
+            Upload Videos
           </strong>
 
           <small>
-            Choose an existing video
+            Choose one or several videos
           </small>
         </span>
 
-        <span>›</span>
+        <span aria-hidden="true">
+          ›
+        </span>
       </button>
     </div>
   </section>
 
-  <!-- PHONE FILE PICKERS -->
+  <!-- FILE PICKERS -->
 
   <input
     id="takePhotoInput"
@@ -382,12 +417,12 @@
   >
 
   <input
-  id="uploadPhotoInput"
-  class="hidden-input"
-  type="file"
-  accept="image/*"
-  multiple
->
+    id="uploadPhotoInput"
+    class="hidden-input"
+    type="file"
+    accept="image/*"
+    multiple
+  >
 
   <input
     id="recordVideoInput"
@@ -398,14 +433,14 @@
   >
 
   <input
-  id="uploadVideoInput"
-  class="hidden-input"
-  type="file"
-  accept="video/*"
-  multiple
->
+    id="uploadVideoInput"
+    class="hidden-input"
+    type="file"
+    accept="video/*"
+    multiple
+  >
 
-  <!-- FILE PREVIEW AND UPLOAD -->
+  <!-- UPLOAD PREVIEW -->
 
   <section
     id="uploadDialog"
@@ -420,7 +455,7 @@
         id="closeUploadDialog"
         class="dialog-close"
         type="button"
-        aria-label="Close"
+        aria-label="Close the upload preview"
       >
         ×
       </button>
@@ -432,7 +467,7 @@
 
       <div class="upload-content">
         <p class="eyebrow dark-eyebrow">
-          Your Memory
+          Your Memories
         </p>
 
         <h2 id="uploadTitle">
@@ -457,13 +492,15 @@
             type="text"
             maxlength="60"
             autocomplete="name"
-            placeholder="How should we credit this memory?"
+            placeholder="How should we credit these memories?"
           >
         </label>
 
         <div
           id="uploadProgress"
           class="upload-progress"
+          role="status"
+          aria-live="polite"
           hidden
         >
           <div class="progress-track">
@@ -471,7 +508,7 @@
           </div>
 
           <p id="progressText">
-            Preparing your memory...
+            Preparing your memories...
           </p>
         </div>
 
@@ -499,11 +536,11 @@
     </div>
   </section>
 
-  <!-- SUCCESS MESSAGE -->
+  <!-- SUCCESS -->
 
   <section
     id="successDialog"
-    class="full-dialog"
+    class="full-dialog success-dialog"
     role="dialog"
     aria-modal="true"
     aria-labelledby="successTitle"
@@ -532,7 +569,7 @@
       <div class="message-actions">
         <button
           id="successHome"
-          class="text-button"
+          class="text-button success-action"
           type="button"
         >
           Back to Wedding
@@ -540,7 +577,7 @@
 
         <button
           id="successGallery"
-          class="primary-button"
+          class="primary-button success-action"
           type="button"
         >
           View Wedding Memories
@@ -548,54 +585,56 @@
       </div>
     </div>
   </section>
-<!-- FULL MEMORY VIEWER -->
 
-<section
-  id="memoryViewer"
-  class="full-dialog memory-viewer"
-  role="dialog"
-  aria-modal="true"
-  aria-labelledby="memoryViewerGuest"
-  hidden
->
-  <div class="memory-viewer-card">
-    <button
-      id="closeMemoryViewer"
-      class="memory-viewer-close"
-      type="button"
-      aria-label="Close full view"
-    >
-      ×
-    </button>
+  <!-- FULL MEMORY VIEWER -->
 
-    <div
-      id="memoryViewerMedia"
-      class="memory-viewer-media"
-    ></div>
-
-    <div class="memory-viewer-footer">
-      <div class="memory-viewer-information">
-        <strong id="memoryViewerGuest">
-          A Wedding Guest
-        </strong>
-
-        <small id="memoryViewerDate">
-          25 July 2026
-        </small>
-      </div>
-
-      <a
-        id="downloadMemory"
-        class="memory-download-button"
-        href="#"
-        target="_blank"
-        rel="noopener"
+  <section
+    id="memoryViewer"
+    class="full-dialog memory-viewer"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="memoryViewerGuest"
+    hidden
+  >
+    <div class="memory-viewer-card">
+      <button
+        id="closeMemoryViewer"
+        class="memory-viewer-close"
+        type="button"
+        aria-label="Close the full memory view"
       >
-        Download
-      </a>
+        ×
+      </button>
+
+      <div
+        id="memoryViewerMedia"
+        class="memory-viewer-media"
+      ></div>
+
+      <div class="memory-viewer-footer">
+        <div class="memory-viewer-information">
+          <strong id="memoryViewerGuest">
+            A Wedding Guest
+          </strong>
+
+          <small id="memoryViewerDate">
+            25 July 2026
+          </small>
+        </div>
+
+        <a
+          id="downloadMemory"
+          class="memory-download-button"
+          href="#"
+          target="_blank"
+          rel="noopener"
+        >
+          Download
+        </a>
+      </div>
     </div>
-  </div>
-</section>
+  </section>
+
   <!-- QR CODE -->
 
   <section
@@ -611,7 +650,7 @@
         id="closeQrDialog"
         class="dialog-close dark-close"
         type="button"
-        aria-label="Close"
+        aria-label="Close the QR code"
       >
         ×
       </button>
@@ -644,7 +683,7 @@
     </div>
   </section>
 
-  <!-- SMALL ALERT MESSAGE -->
+  <!-- NOTIFICATION -->
 
   <div
     id="toast"
