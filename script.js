@@ -83,7 +83,13 @@ function collectElements() {
     "qrWebsiteAddress",
     "shareWebsite",
     "toast",
-    "heroImage"
+"heroImage",
+"memoryViewer",
+"closeMemoryViewer",
+"memoryViewerMedia",
+"memoryViewerGuest",
+"memoryViewerDate",
+"downloadMemory"
   ];
 
   ids.forEach((id) => {
@@ -215,7 +221,22 @@ function connectButtons() {
     "click",
     shareWebsiteLink
   );
+elements.closeMemoryViewer.addEventListener(
+  "click",
+  closeMemoryViewer
+);
 
+elements.memoryViewer.addEventListener(
+  "click",
+  (event) => {
+    if (
+      event.target ===
+      elements.memoryViewer
+    ) {
+      closeMemoryViewer();
+    }
+  }
+);
   elements.uploadDialog.addEventListener(
     "click",
     (event) => {
@@ -861,107 +882,190 @@ function renderGallery(memories) {
 
   memories.forEach((memory) => {
     const card =
-      document.createElement("article");
+      document.createElement("button");
 
-    card.className =
-      "memory-card";
+    card.type = "button";
+    card.className = "memory-card";
 
-    const mediaBox =
-      document.createElement("div");
-
-    mediaBox.className =
-      "memory-media";
+    const guestName =
+      memory.guestName ||
+      "A Wedding Guest";
 
     const isVideo =
       String(
         memory.mimeType || ""
       ).startsWith("video/");
 
-    if (isVideo) {
-      const frame =
-        document.createElement("iframe");
+    card.setAttribute(
+      "aria-label",
+      isVideo
+        ? "Open video shared by " + guestName
+        : "Open photo shared by " + guestName
+    );
 
-      frame.src =
-        memory.embedUrl ||
-        memory.driveUrl ||
-        "";
-
-      frame.title =
-        "Wedding video shared by " +
-        (
-          memory.guestName ||
-          "a guest"
-        );
-
-      frame.loading = "lazy";
-      frame.allow =
-        "autoplay; fullscreen";
-
-      frame.setAttribute(
-        "allowfullscreen",
-        ""
-      );
-
-      mediaBox.appendChild(frame);
-    } else {
-      const image =
-        document.createElement("img");
-
-      image.src =
-        memory.thumbnailUrl ||
-        memory.url ||
-        "";
-
-      image.alt =
-        "Wedding memory shared by " +
-        (
-          memory.guestName ||
-          "a guest"
-        );
-
-      image.loading = "lazy";
-
-      mediaBox.appendChild(image);
-    }
-
-    const details =
+    const mediaBox =
       document.createElement("div");
 
-    details.className =
-      "memory-details";
+    mediaBox.className = "memory-media";
 
-    const guestName =
-      document.createElement("strong");
+    const thumbnail =
+      document.createElement("img");
 
-    guestName.textContent =
-      memory.guestName ||
-      "A Wedding Guest";
+    thumbnail.src =
+      memory.thumbnailUrl ||
+      memory.url ||
+      "";
 
-    const date =
-      document.createElement("small");
+    thumbnail.alt =
+      isVideo
+        ? "Wedding video shared by " + guestName
+        : "Wedding photo shared by " + guestName;
 
-    date.textContent =
-      formatMemoryDate(
-        memory.createdAt
+    thumbnail.loading = "lazy";
+
+    mediaBox.appendChild(thumbnail);
+
+    if (isVideo) {
+      const videoBadge =
+        document.createElement("span");
+
+      videoBadge.className = "video-badge";
+      videoBadge.setAttribute(
+        "aria-hidden",
+        "true"
       );
 
-    details.append(
-      guestName,
-      date
+      videoBadge.textContent = "▶";
+
+      mediaBox.appendChild(videoBadge);
+    }
+
+    card.appendChild(mediaBox);
+
+    card.addEventListener(
+      "click",
+      () => {
+        openMemoryViewer(memory);
+      }
     );
 
-    card.append(
-      mediaBox,
-      details
-    );
-
-    elements.galleryGrid.appendChild(
-      card
-    );
+    elements.galleryGrid.appendChild(card);
   });
 }
 
-function closeSuccessDialog() {
+function openMemoryViewer(memory) {
+  elements.memoryViewerMedia.replaceChildren();
+
+  const isVideo =
+    String(
+      memory.mimeType || ""
+    ).startsWith("video/");
+
+  if (isVideo) {
+    const frame =
+      document.createElement("iframe");
+
+    frame.src =
+      memory.embedUrl ||
+      memory.driveUrl ||
+      "";
+
+    frame.title =
+      "Wedding video shared by " +
+      (
+        memory.guestName ||
+        "a guest"
+      );
+
+    frame.allow =
+      "autoplay; fullscreen";
+
+    frame.setAttribute(
+      "allowfullscreen",
+      ""
+    );
+
+    elements.memoryViewerMedia.appendChild(
+      frame
+    );
+  } else {
+    const image =
+      document.createElement("img");
+
+    let fullImageUrl =
+      memory.thumbnailUrl ||
+      memory.url ||
+      "";
+
+    fullImageUrl =
+      fullImageUrl.replace(
+        /sz=w\d+/i,
+        "sz=w2400"
+      );
+
+    image.src = fullImageUrl;
+
+    image.alt =
+      "Wedding memory shared by " +
+      (
+        memory.guestName ||
+        "a guest"
+      );
+
+    elements.memoryViewerMedia.appendChild(
+      image
+    );
+  }
+
+  elements.memoryViewerGuest.textContent =
+    memory.guestName ||
+    "A Wedding Guest";
+
+  elements.memoryViewerDate.textContent =
+    formatMemoryDate(
+      memory.createdAt
+    );
+
+  elements.downloadMemory.href =
+    memory.downloadUrl ||
+    memory.driveUrl ||
+    memory.url ||
+    "#";
+
+  elements.downloadMemory.textContent =
+    isVideo
+      ? "Download Video"
+      : "Download Photo";
+
+  if (memory.name) {
+    elements.downloadMemory.setAttribute(
+      "download",
+      memory.name
+    );
+  } else {
+    elements.downloadMemory.removeAttribute(
+      "download"
+    );
+  }
+
+  elements.memoryViewer.hidden = false;
+
+  document.body.classList.add(
+    "modal-open"
+  );
+}
+
+function closeMemoryViewer() {
+  elements.memoryViewer.hidden = true;
+
+  elements.memoryViewerMedia.replaceChildren();
+
+  elements.downloadMemory.href = "#";
+
+  document.body.classList.remove(
+    "modal-open"
+  );
+} {
   elements.successDialog.hidden = true;
 
   document.body.classList.remove(
@@ -1082,8 +1186,10 @@ function handleEscapeKey(event) {
     return;
   }
 
-  if (!elements.qrDialog.hidden) {
-    closeQrDialog();
+  if (!elements.memoryViewer.hidden) {
+  closeMemoryViewer();
+} else if (!elements.qrDialog.hidden) {
+  closeQrDialog();
   } else if (
     !elements.successDialog.hidden
   ) {
