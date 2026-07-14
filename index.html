@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  >
+
+  <meta name="theme-color" content="#7a1f45">
+
+  <meta
+    name="description"
+    content="Share and view memories from Theresa and Precious' wedding."
+  >
+
+  <title>Theresa & Precious | Wedding Memories</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+
+  <link
+    rel="preconnect"
+    href="https://fonts.gstatic.com"
+    crossorigin
+  >
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Poppins:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  >
+
+  <link rel="stylesheet" href="styles.css">
+
+  <script
+    defer
+    src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
+  ></script>
+
+  <script defer src="script.js"></script>
+</head>
+
+<body>
+  <main>
+    <!-- HOME PAGE -->
+
+    <section id="homeView" class="view">
+      <header class="hero">
+        <!--
+          Upload the wedding photo into the same folder
+          as index.html and name it hero.jpg
+        -->
+
+        <img
+          id="heroImage"
+          src="assets/images/hero.jpg"
+          alt="Theresa and Precious"
+        >
+
+        <div class="hero-overlay" aria-hidden="true"></div>
+
+        <div class="hero-copy">
+          <p class="eyebrow">Our Wedding</p>
+
+          <h1>
+            Theresa <span>&amp;</span> Precious
+          </h1>
+
+          <p class="wedding-date">
+            25 July 2026
+          </p>
+
+          <p class="hero-message">
+            We'll love to see our memories from your view
+          </p>
+        </div>
+      </header>
+
+      <section class="welcome-section">
+        <div class="content-shell">
+          <span class="gold-star" aria-hidden="true">
+            ✦
+          </span>
+
+          <h2>
+            Share the moments you captured
+          </h2>
+
+          <p>
+            Every smile, dance, laugh and beautiful detail becomes
+            part of the story we will keep.
+          </p>
+
+          <button
+            id="openShareSheet"
+            class="share-main-button"
+            type="button"
+          >
+            <span class="camera-icon" aria-hidden="true">
+              📷
+            </span>
+
+            <span>
+              Share Your Memories
+            </span>
+          </button>
+
+          <button
+            id="openGallery"
+            class="gallery-link"
+            type="button"
+          >
+            <span aria-hidden="true">♡</span>
+
+            View Today's Memories
+
+            <span aria-hidden="true">→</span>
+          </button>
+        </div>
+      </section>
+
+      <footer class="site-footer">
+        <span>
+          Theresa &amp; Precious
+        </span>
+
+        <button id="openQrCode" type="button">
+          Wedding QR Code
+        </button>
+      </footer>
+    </section>
+
+    <!-- GALLERY PAGE -->
+
+    <section
+      id="galleryView"
+      class="view gallery-view"
+      hidden
+    >
+      <header class="gallery-header">
+        <button
+          id="closeGallery"
+          class="round-button"
+          type="button"
+          aria-label="Return to home"
+        >
+          ←
+        </button>
+
+        <div>
+          <p>
+            Theresa &amp; Precious
+          </p>
+
+          <h1>
+            Today's Memories
+          </h1>
+        </div>
+
+        <button
+          id="refreshGallery"
+          class="round-button"
+          type="button"
+          aria-label="Refresh gallery"
+        >
+          ↻
+        </button>
+      </header>
+
+      <div class="gallery-intro">
+        <span aria-hidden="true">✦</span>
+
+        <p>
+          A wedding album built from the moments our guests
+          saw and captured.
+        </p>
+      </div>
+
+      <div
+        id="galleryLoading"
+        class="gallery-loading"
+        role="status"
+      >
+        <span
+          class="spinner"
+          aria-hidden="true"
+        ></span>
+
+        <p>
+          Opening the wedding album...
+        </p>
+      </div>
+
+      <div
+        id="galleryGrid"
+        class="gallery-grid"
+      ></div>
+
+      <div
+        id="emptyGallery"
+        class="empty-gallery"
+        hidden
+      >
+        <span aria-hidden="true">♡</span>
+
+        <h2>
+          The album is waiting for its first memory
+        </h2>
+
+        <p>
+          Be the first guest to share a beautiful moment from today.
+        </p>
+
+        <button
+          id="shareFromEmptyGallery"
+          class="secondary-button"
+          type="button"
+        >
+          Share a Memory
+        </button>
+      </div>
+
+      <button
+        id="galleryShareButton"
+        class="floating-share-button"
+        type="button"
+      >
+        <span aria-hidden="true">📷</span>
+
+        Share
+      </button>
+    </section>
+  </main>
+
+  <!-- DARK BACKDROP -->
+
+  <div
+    id="backdrop"
+    class="backdrop"
+    hidden
+  ></div>
+
+  <!-- SHARE OPTIONS -->
+
+  <section
+    id="shareSheet"
+    class="bottom-sheet"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="shareSheetTitle"
+    hidden
+  >
+    <div
+      class="sheet-handle"
+      aria-hidden="true"
+    ></div>
+
+    <div class="sheet-heading">
+      <div>
+        <p>
+          Theresa &amp; Precious
+        </p>
+
+        <h2 id="shareSheetTitle">
+          Share Your Memories
+        </h2>
+
+        <span>
+          Choose how you would like to add your moment.
+        </span>
+      </div>
+
+      <button
+        id="closeShareSheet"
+        class="round-button"
+        type="button"
+        aria-label="Close"
+      >
+        ×
+      </button>
+    </div>
+
+    <div class="share-options">
+      <button
+        class="share-option"
+        type="button"
+        data-input="takePhotoInput"
+      >
+        <span class="option-icon">
+          📷
+        </span>
+
+        <span>
+          <strong>
+            Take a Photo
+          </strong>
+
+          <small>
+            Open your camera
+          </small>
+        </span>
+
+        <span>›</span>
+      </button>
+
+      <button
+        class="share-option"
+        type="button"
+        data-input="uploadPhotoInput"
+      >
+        <span class="option-icon">
+          🖼️
+        </span>
+
+        <span>
+          <strong>
+            Upload a Photo
+          </strong>
+
+          <small>
+            Choose from your gallery
+          </small>
+        </span>
+
+        <span>›</span>
+      </button>
+
+      <button
+        class="share-option"
+        type="button"
+        data-input="recordVideoInput"
+      >
+        <span class="option-icon">
+          🎥
+        </span>
+
+        <span>
+          <strong>
+            Record a Video
+          </strong>
+
+          <small>
+            Capture a moment now
+          </small>
+        </span>
+
+        <span>›</span>
+      </button>
+
+      <button
+        class="share-option"
+        type="button"
+        data-input="uploadVideoInput"
+      >
+        <span class="option-icon">
+          📁
+        </span>
+
+        <span>
+          <strong>
+            Upload a Video
+          </strong>
+
+          <small>
+            Choose an existing video
+          </small>
+        </span>
+
+        <span>›</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- PHONE FILE PICKERS -->
+
+  <input
+    id="takePhotoInput"
+    class="hidden-input"
+    type="file"
+    accept="image/*"
+    capture="environment"
+  >
+
+  <input
+    id="uploadPhotoInput"
+    class="hidden-input"
+    type="file"
+    accept="image/*"
+  >
+
+  <input
+    id="recordVideoInput"
+    class="hidden-input"
+    type="file"
+    accept="video/*"
+    capture="environment"
+  >
+
+  <input
+    id="uploadVideoInput"
+    class="hidden-input"
+    type="file"
+    accept="video/*"
+  >
+
+  <!-- FILE PREVIEW AND UPLOAD -->
+
+  <section
+    id="uploadDialog"
+    class="full-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="uploadTitle"
+    hidden
+  >
+    <div class="upload-card">
+      <button
+        id="closeUploadDialog"
+        class="dialog-close"
+        type="button"
+        aria-label="Close"
+      >
+        ×
+      </button>
+
+      <div
+        id="previewArea"
+        class="preview-area"
+      ></div>
+
+      <div class="upload-content">
+        <p class="eyebrow dark-eyebrow">
+          Your Memory
+        </p>
+
+        <h2 id="uploadTitle">
+          Ready to share?
+        </h2>
+
+        <p
+          id="selectedFileDetails"
+          class="file-details"
+        ></p>
+
+        <label
+          class="name-field"
+          for="guestName"
+        >
+          <span>
+            Your name <small>optional</small>
+          </span>
+
+          <input
+            id="guestName"
+            type="text"
+            maxlength="60"
+            autocomplete="name"
+            placeholder="How should we credit this memory?"
+          >
+        </label>
+
+        <div
+          id="uploadProgress"
+          class="upload-progress"
+          hidden
+        >
+          <div class="progress-track">
+            <span id="progressBar"></span>
+          </div>
+
+          <p id="progressText">
+            Preparing your memory...
+          </p>
+        </div>
+
+        <div
+          id="uploadActions"
+          class="dialog-actions"
+        >
+          <button
+            id="chooseAnotherFile"
+            class="text-button"
+            type="button"
+          >
+            Choose another
+          </button>
+
+          <button
+            id="confirmUpload"
+            class="primary-button"
+            type="button"
+          >
+            Add to the Album
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SUCCESS MESSAGE -->
+
+  <section
+    id="successDialog"
+    class="full-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="successTitle"
+    hidden
+  >
+    <div class="message-card">
+      <div
+        class="success-heart"
+        aria-hidden="true"
+      >
+        ♡
+      </div>
+
+      <p class="eyebrow dark-eyebrow">
+        Memory Received
+      </p>
+
+      <h2 id="successTitle">
+        Thank you for sharing this moment
+      </h2>
+
+      <p>
+        It is now part of Theresa and Precious' wedding story.
+      </p>
+
+      <div class="message-actions">
+        <button
+          id="successHome"
+          class="text-button"
+          type="button"
+        >
+          Back to Wedding
+        </button>
+
+        <button
+          id="successGallery"
+          class="primary-button"
+          type="button"
+        >
+          View Today's Memories
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- QR CODE -->
+
+  <section
+    id="qrDialog"
+    class="full-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="qrTitle"
+    hidden
+  >
+    <div class="message-card qr-card">
+      <button
+        id="closeQrDialog"
+        class="dialog-close dark-close"
+        type="button"
+        aria-label="Close"
+      >
+        ×
+      </button>
+
+      <p class="eyebrow dark-eyebrow">
+        Wedding Memories
+      </p>
+
+      <h2 id="qrTitle">
+        Scan to share a memory
+      </h2>
+
+      <div
+        id="qrCode"
+        class="qr-code"
+      ></div>
+
+      <p
+        id="qrWebsiteAddress"
+        class="qr-address"
+      ></p>
+
+      <button
+        id="shareWebsite"
+        class="secondary-button"
+        type="button"
+      >
+        Share Website Link
+      </button>
+    </div>
+  </section>
+
+  <!-- SMALL ALERT MESSAGE -->
+
+  <div
+    id="toast"
+    class="toast"
+    role="status"
+    aria-live="polite"
+    hidden
+  ></div>
+</body>
+</html>
