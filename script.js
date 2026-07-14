@@ -1,26 +1,18 @@
 "use strict";
 
-/*
-  GOOGLE DRIVE CONNECTION
-
-  We will create the Google Apps Script backend separately.
-
-  When it has been created, paste its web app address
-  between the quotation marks below.
-*/
-
-const GOOGLE_APPS_SCRIPT_URL = "";
+const GOOGLE_APPS_SCRIPT_URL =
+  "https://script.google.com/macros/s/AKfycbwL3qk1XIilfLCuCt-6W2Bt2Ps4vKDG9ko3SDE1rtbLP9rReoEPf_A8iR-u40uJP1yx6g/exec";
 
 const SETTINGS = {
   eventName: "Theresa & Precious",
   maximumFileSizeMB: 25,
+  maximumFilesPerUpload: 20,
   galleryRefreshTime: 60000
 };
 
 const state = {
-  selectedFile: null,
-  selectedFileUrl: "",
-  demoMemories: [],
+  selectedFiles: [],
+  selectedFileUrls: [],
   galleryTimer: null,
   toastTimer: null
 };
@@ -95,14 +87,16 @@ function collectElements() {
   ];
 
   ids.forEach((id) => {
-    elements[id] = document.getElementById(id);
+    elements[id] =
+      document.getElementById(id);
   });
 
-  elements.shareOptions = Array.from(
-    document.querySelectorAll(
-      ".share-option[data-input]"
-    )
-  );
+  elements.shareOptions =
+    Array.from(
+      document.querySelectorAll(
+        ".share-option[data-input]"
+      )
+    );
 
   elements.fileInputs = [
     elements.takePhotoInput,
@@ -154,19 +148,25 @@ function connectButtons() {
   );
 
   elements.shareOptions.forEach((button) => {
-    button.addEventListener("click", () => {
-      const inputId = button.dataset.input;
-      const input = document.getElementById(inputId);
+    button.addEventListener(
+      "click",
+      () => {
+        const inputId =
+          button.dataset.input;
 
-      closeShareSheet();
-      input.click();
-    });
+        const input =
+          document.getElementById(inputId);
+
+        closeShareSheet();
+        input.click();
+      }
+    );
   });
 
   elements.fileInputs.forEach((input) => {
     input.addEventListener(
       "change",
-      handleSelectedFile
+      handleSelectedFiles
     );
   });
 
@@ -182,7 +182,7 @@ function connectButtons() {
 
   elements.confirmUpload.addEventListener(
     "click",
-    uploadMemory
+    uploadMemories
   );
 
   elements.successHome.addEventListener(
@@ -219,7 +219,10 @@ function connectButtons() {
   elements.uploadDialog.addEventListener(
     "click",
     (event) => {
-      if (event.target === elements.uploadDialog) {
+      if (
+        event.target ===
+        elements.uploadDialog
+      ) {
         closeUploadDialog();
       }
     }
@@ -228,7 +231,10 @@ function connectButtons() {
   elements.successDialog.addEventListener(
     "click",
     (event) => {
-      if (event.target === elements.successDialog) {
+      if (
+        event.target ===
+        elements.successDialog
+      ) {
         closeSuccessDialog();
       }
     }
@@ -237,7 +243,10 @@ function connectButtons() {
   elements.qrDialog.addEventListener(
     "click",
     (event) => {
-      if (event.target === elements.qrDialog) {
+      if (
+        event.target ===
+        elements.qrDialog
+      ) {
         closeQrDialog();
       }
     }
@@ -245,7 +254,10 @@ function connectButtons() {
 }
 
 function showCorrectPage() {
-  if (window.location.hash === "#gallery") {
+  if (
+    window.location.hash ===
+    "#gallery"
+  ) {
     showGalleryView();
   } else {
     showHomeView();
@@ -253,8 +265,12 @@ function showCorrectPage() {
 }
 
 function openGalleryPage() {
-  if (window.location.hash !== "#gallery") {
-    window.location.hash = "gallery";
+  if (
+    window.location.hash !==
+    "#gallery"
+  ) {
+    window.location.hash =
+      "gallery";
   } else {
     showGalleryView();
   }
@@ -294,58 +310,108 @@ function openShareSheet() {
   elements.backdrop.hidden = false;
   elements.shareSheet.hidden = false;
 
-  document.body.classList.add("modal-open");
+  document.body.classList.add(
+    "modal-open"
+  );
 
   requestAnimationFrame(() => {
-    elements.backdrop.classList.add("visible");
-    elements.shareSheet.classList.add("visible");
+    elements.backdrop.classList.add(
+      "visible"
+    );
+
+    elements.shareSheet.classList.add(
+      "visible"
+    );
   });
 }
 
 function closeShareSheet() {
-  elements.backdrop.classList.remove("visible");
-  elements.shareSheet.classList.remove("visible");
+  elements.backdrop.classList.remove(
+    "visible"
+  );
+
+  elements.shareSheet.classList.remove(
+    "visible"
+  );
 
   window.setTimeout(() => {
     elements.backdrop.hidden = true;
     elements.shareSheet.hidden = true;
 
-    document.body.classList.remove("modal-open");
+    document.body.classList.remove(
+      "modal-open"
+    );
   }, 280);
 }
 
-function handleSelectedFile(event) {
-  const file =
-    event.target.files &&
-    event.target.files[0];
+function handleSelectedFiles(event) {
+  const files =
+    Array.from(
+      event.target.files || []
+    );
 
   event.target.value = "";
 
-  if (!file) {
+  if (!files.length) {
     return;
   }
 
-  const validationMessage =
-    validateFile(file);
+  if (
+    files.length >
+    SETTINGS.maximumFilesPerUpload
+  ) {
+    showToast(
+      "Please select no more than " +
+        SETTINGS.maximumFilesPerUpload +
+        " files at once."
+    );
 
-  if (validationMessage) {
-    showToast(validationMessage);
     return;
   }
 
-  clearSelectedFile();
+  const validFiles = [];
+  const rejectedFiles = [];
 
-  state.selectedFile = file;
+  files.forEach((file) => {
+    const validationMessage =
+      validateFile(file);
 
-  state.selectedFileUrl =
-    URL.createObjectURL(file);
+    if (validationMessage) {
+      rejectedFiles.push(file.name);
+    } else {
+      validFiles.push(file);
+    }
+  });
 
-  showFilePreview(
-    file,
-    state.selectedFileUrl
-  );
+  if (!validFiles.length) {
+    showToast(
+      "None of the selected files could be added. Use photos or videos smaller than " +
+        SETTINGS.maximumFileSizeMB +
+        " MB each."
+    );
+
+    return;
+  }
+
+  clearSelectedFiles();
+
+  state.selectedFiles = validFiles;
+
+  state.selectedFileUrls =
+    validFiles.map((file) =>
+      URL.createObjectURL(file)
+    );
+
+  showFilesPreview();
 
   openUploadDialog();
+
+  if (rejectedFiles.length) {
+    showToast(
+      rejectedFiles.length +
+        " file(s) were skipped because they were unsupported or too large."
+    );
+  }
 }
 
 function validateFile(file) {
@@ -356,7 +422,7 @@ function validateFile(file) {
     file.type.startsWith("video/");
 
   if (!isPhoto && !isVideo) {
-    return "Please choose a photo or video file.";
+    return "Unsupported file";
   }
 
   const maximumBytes =
@@ -365,46 +431,98 @@ function validateFile(file) {
     1024;
 
   if (file.size > maximumBytes) {
-    return (
-      "Please choose a file smaller than " +
-      SETTINGS.maximumFileSizeMB +
-      " MB."
-    );
+    return "File too large";
   }
 
   return "";
 }
 
-function showFilePreview(
-  file,
-  fileUrl
-) {
+function showFilesPreview() {
   elements.previewArea.replaceChildren();
 
-  if (file.type.startsWith("image/")) {
-    const image =
-      document.createElement("img");
+  const previewGrid =
+    document.createElement("div");
 
-    image.src = fileUrl;
-    image.alt = "Selected wedding memory";
+  previewGrid.className =
+    "multi-preview-grid";
 
-    elements.previewArea.appendChild(image);
-  } else {
-    const video =
-      document.createElement("video");
+  state.selectedFiles.forEach(
+    (file, index) => {
+      const previewItem =
+        document.createElement("div");
 
-    video.src = fileUrl;
-    video.controls = true;
-    video.playsInline = true;
-    video.preload = "metadata";
+      previewItem.className =
+        "multi-preview-item";
 
-    elements.previewArea.appendChild(video);
-  }
+      const fileUrl =
+        state.selectedFileUrls[index];
+
+      if (
+        file.type.startsWith("image/")
+      ) {
+        const image =
+          document.createElement("img");
+
+        image.src = fileUrl;
+        image.alt =
+          "Selected wedding memory";
+
+        previewItem.appendChild(image);
+      } else {
+        const video =
+          document.createElement("video");
+
+        video.src = fileUrl;
+        video.controls = true;
+        video.playsInline = true;
+        video.preload = "metadata";
+
+        previewItem.appendChild(video);
+      }
+
+      const number =
+        document.createElement("span");
+
+      number.className =
+        "preview-number";
+
+      number.textContent =
+        String(index + 1);
+
+      previewItem.appendChild(number);
+      previewGrid.appendChild(previewItem);
+    }
+  );
+
+  elements.previewArea.appendChild(
+    previewGrid
+  );
+
+  const totalSize =
+    state.selectedFiles.reduce(
+      (total, file) =>
+        total + file.size,
+      0
+    );
+
+  const fileWord =
+    state.selectedFiles.length === 1
+      ? "file"
+      : "files";
 
   elements.selectedFileDetails.textContent =
-    file.name +
-    " · " +
-    formatFileSize(file.size);
+    state.selectedFiles.length +
+    " " +
+    fileWord +
+    " selected · " +
+    formatFileSize(totalSize);
+
+  elements.confirmUpload.textContent =
+    state.selectedFiles.length === 1
+      ? "Add to the Album"
+      : "Add " +
+        state.selectedFiles.length +
+        " Memories";
 }
 
 function openUploadDialog() {
@@ -412,39 +530,59 @@ function openUploadDialog() {
   elements.uploadActions.hidden = false;
   elements.confirmUpload.disabled = false;
 
-  elements.progressBar.style.width = "0%";
+  elements.progressBar.style.width =
+    "0%";
 
   elements.progressText.textContent =
-    "Preparing your memory...";
+    "Preparing your memories...";
 
   elements.uploadDialog.hidden = false;
 
-  document.body.classList.add("modal-open");
+  document.body.classList.add(
+    "modal-open"
+  );
 }
 
 function closeUploadDialog() {
   elements.uploadDialog.hidden = true;
 
-  document.body.classList.remove("modal-open");
+  document.body.classList.remove(
+    "modal-open"
+  );
 
   elements.guestName.value = "";
 
-  clearSelectedFile();
+  clearSelectedFiles();
 }
 
 function chooseAnotherFile() {
   elements.uploadDialog.hidden = true;
 
-  document.body.classList.remove("modal-open");
+  document.body.classList.remove(
+    "modal-open"
+  );
 
-  clearSelectedFile();
+  clearSelectedFiles();
   openShareSheet();
 }
 
-async function uploadMemory() {
-  if (!state.selectedFile) {
+async function uploadMemories() {
+  if (!state.selectedFiles.length) {
     showToast(
-      "Please choose a photo or video first."
+      "Please choose at least one photo or video."
+    );
+
+    return;
+  }
+
+  if (
+    !GOOGLE_APPS_SCRIPT_URL ||
+    !GOOGLE_APPS_SCRIPT_URL.endsWith(
+      "/exec"
+    )
+  ) {
+    showToast(
+      "The Google Drive upload address has not been added correctly."
     );
 
     return;
@@ -452,33 +590,121 @@ async function uploadMemory() {
 
   setUploadingState(true);
 
-  try {
-    if (!GOOGLE_APPS_SCRIPT_URL.trim()) {
-      saveDemoMemory();
+  const totalFiles =
+    state.selectedFiles.length;
 
-      await wait(700);
-    } else {
-      await uploadToGoogleDrive();
+  let successfulUploads = 0;
+  const failedFiles = [];
+
+  for (
+    let index = 0;
+    index < totalFiles;
+    index += 1
+  ) {
+    const file =
+      state.selectedFiles[index];
+
+    const startingPercent =
+      Math.round(
+        (index / totalFiles) * 100
+      );
+
+    updateProgress(
+      startingPercent,
+      "Uploading " +
+        (index + 1) +
+        " of " +
+        totalFiles +
+        ": " +
+        file.name
+    );
+
+    try {
+      await uploadOneFile(file);
+
+      successfulUploads += 1;
+    } catch (error) {
+      console.error(
+        "Upload failed:",
+        file.name,
+        error
+      );
+
+      failedFiles.push(file.name);
     }
+  }
 
-    elements.uploadDialog.hidden = true;
+  updateProgress(
+    100,
+    "Upload complete."
+  );
 
-    clearSelectedFile();
-    setUploadingState(false);
+  await wait(500);
 
-    elements.successDialog.hidden = false;
+  elements.uploadDialog.hidden = true;
 
-    document.body.classList.add("modal-open");
-  } catch (error) {
-    console.error(error);
+  clearSelectedFiles();
+  setUploadingState(false);
 
-    setUploadingState(false);
+  if (!successfulUploads) {
+    document.body.classList.remove(
+      "modal-open"
+    );
 
     showToast(
-      error.message ||
-      "The upload did not complete. Please try again."
+      "The files could not be uploaded. Please check the connection and try again."
+    );
+
+    return;
+  }
+
+  elements.successDialog.hidden = false;
+
+  document.body.classList.add(
+    "modal-open"
+  );
+
+  if (failedFiles.length) {
+    showToast(
+      successfulUploads +
+        " file(s) uploaded. " +
+        failedFiles.length +
+        " file(s) failed."
     );
   }
+}
+
+async function uploadOneFile(file) {
+  const base64File =
+    await convertFileToBase64(file);
+
+  const uploadData = {
+    action: "upload",
+    eventName: SETTINGS.eventName,
+    guestName:
+      elements.guestName.value.trim(),
+    fileName:
+      createSafeFileName(file.name),
+    mimeType: file.type,
+    base64: base64File,
+    uploadedAt:
+      new Date().toISOString()
+  };
+
+  await fetch(
+    GOOGLE_APPS_SCRIPT_URL,
+    {
+      method: "POST",
+      mode: "no-cors",
+      headers: {
+        "Content-Type":
+          "text/plain;charset=utf-8"
+      },
+      body: JSON.stringify(uploadData)
+    }
+  );
+
+  await wait(350);
 }
 
 function setUploadingState(isUploading) {
@@ -493,123 +719,13 @@ function setUploadingState(isUploading) {
 
   if (isUploading) {
     updateProgress(
-      12,
-      "Preparing your memory..."
+      3,
+      "Preparing your memories..."
     );
   }
 }
 
-async function uploadToGoogleDrive() {
-  const file = state.selectedFile;
-
-  const base64File =
-    await convertFileToBase64(file);
-
-  updateProgress(
-    38,
-    "Sending your memory securely..."
-  );
-
-  const response = await fetch(
-    GOOGLE_APPS_SCRIPT_URL,
-    {
-      method: "POST",
-
-      headers: {
-        "Content-Type":
-          "text/plain;charset=utf-8"
-      },
-
-      body: JSON.stringify({
-        action: "upload",
-
-        eventName:
-          SETTINGS.eventName,
-
-        guestName:
-          elements.guestName.value.trim(),
-
-        fileName:
-          createSafeFileName(file.name),
-
-        mimeType:
-          file.type,
-
-        base64:
-          base64File,
-
-        uploadedAt:
-          new Date().toISOString()
-      })
-    }
-  );
-
-  updateProgress(
-    82,
-    "Adding it to the wedding album..."
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      "The upload service could not be reached."
-    );
-  }
-
-  const result = await response.json();
-
-  if (!result.success) {
-    throw new Error(
-      result.message ||
-      "Google Drive did not accept the file."
-    );
-  }
-
-  updateProgress(
-    100,
-    "Your memory has been added."
-  );
-
-  await wait(450);
-}
-
-function saveDemoMemory() {
-  const file = state.selectedFile;
-
-  state.demoMemories.unshift({
-    id:
-      "demo-" +
-      Date.now(),
-
-    name:
-      file.name,
-
-    mimeType:
-      file.type,
-
-    url:
-      state.selectedFileUrl,
-
-    thumbnailUrl:
-      state.selectedFileUrl,
-
-    guestName:
-      elements.guestName.value.trim() ||
-      "A Wedding Guest",
-
-    createdAt:
-      new Date().toISOString(),
-
-    demo:
-      true
-  });
-
-  updateProgress(
-    100,
-    "Your memory has been added for this preview."
-  );
-}
-
-async function loadGallery(
+function loadGallery(
   showRefreshMessage
 ) {
   elements.emptyGallery.hidden = true;
@@ -622,63 +738,115 @@ async function loadGallery(
 
   elements.galleryLoading.hidden = false;
 
-  try {
-    let memories = [];
+  loadGalleryWithJsonp()
+    .then((memories) => {
+      renderGallery(memories);
+    })
+    .catch((error) => {
+      console.error(error);
 
-    if (!GOOGLE_APPS_SCRIPT_URL.trim()) {
-      memories = state.demoMemories;
-    } else {
+      elements.galleryGrid.replaceChildren();
+
+      elements.emptyGallery.hidden = false;
+
+      showToast(
+        error.message ||
+          "The gallery could not be loaded."
+      );
+    })
+    .finally(() => {
+      elements.galleryLoading.hidden = true;
+    });
+}
+
+function loadGalleryWithJsonp() {
+  return new Promise(
+    (resolve, reject) => {
+      const callbackName =
+        "weddingGalleryCallback_" +
+        Date.now();
+
+      const script =
+        document.createElement("script");
+
+      const timeout =
+        window.setTimeout(() => {
+          cleanup();
+
+          reject(
+            new Error(
+              "The wedding album took too long to load."
+            )
+          );
+        }, 15000);
+
+      function cleanup() {
+        window.clearTimeout(timeout);
+
+        if (script.parentNode) {
+          script.parentNode.removeChild(
+            script
+          );
+        }
+
+        delete window[callbackName];
+      }
+
+      window[callbackName] =
+        function (result) {
+          cleanup();
+
+          if (
+            !result ||
+            !result.success ||
+            !Array.isArray(result.files)
+          ) {
+            reject(
+              new Error(
+                result &&
+                result.message
+                  ? result.message
+                  : "The gallery returned an invalid response."
+              )
+            );
+
+            return;
+          }
+
+          resolve(result.files);
+        };
+
       const separator =
-        GOOGLE_APPS_SCRIPT_URL.includes("?")
+        GOOGLE_APPS_SCRIPT_URL.includes(
+          "?"
+        )
           ? "&"
           : "?";
 
-      const galleryUrl =
+      script.src =
         GOOGLE_APPS_SCRIPT_URL +
         separator +
-        "action=list&t=" +
+        "action=list" +
+        "&callback=" +
+        encodeURIComponent(
+          callbackName
+        ) +
+        "&t=" +
         Date.now();
 
-      const response =
-        await fetch(galleryUrl);
+      script.onerror = () => {
+        cleanup();
 
-      if (!response.ok) {
-        throw new Error(
-          "The wedding album could not be loaded."
+        reject(
+          new Error(
+            "The wedding gallery could not connect to Google Drive."
+          )
         );
-      }
+      };
 
-      const result =
-        await response.json();
-
-      if (
-        !result.success ||
-        !Array.isArray(result.files)
-      ) {
-        throw new Error(
-          result.message ||
-          "The wedding album returned an invalid response."
-        );
-      }
-
-      memories = result.files;
+      document.body.appendChild(script);
     }
-
-    renderGallery(memories);
-  } catch (error) {
-    console.error(error);
-
-    elements.galleryGrid.replaceChildren();
-
-    elements.emptyGallery.hidden = false;
-
-    showToast(
-      error.message ||
-      "The gallery could not be loaded."
-    );
-  } finally {
-    elements.galleryLoading.hidden = true;
-  }
+  );
 }
 
 function renderGallery(memories) {
@@ -695,12 +863,14 @@ function renderGallery(memories) {
     const card =
       document.createElement("article");
 
-    card.className = "memory-card";
+    card.className =
+      "memory-card";
 
     const mediaBox =
       document.createElement("div");
 
-    mediaBox.className = "memory-media";
+    mediaBox.className =
+      "memory-media";
 
     const isVideo =
       String(
@@ -708,24 +878,31 @@ function renderGallery(memories) {
       ).startsWith("video/");
 
     if (isVideo) {
-      const video =
-        document.createElement("video");
+      const frame =
+        document.createElement("iframe");
 
-      video.src =
-        memory.url ||
-        memory.previewUrl ||
+      frame.src =
+        memory.embedUrl ||
+        memory.driveUrl ||
         "";
 
-      video.controls = true;
-      video.playsInline = true;
-      video.preload = "metadata";
+      frame.title =
+        "Wedding video shared by " +
+        (
+          memory.guestName ||
+          "a guest"
+        );
 
-      if (memory.thumbnailUrl) {
-        video.poster =
-          memory.thumbnailUrl;
-      }
+      frame.loading = "lazy";
+      frame.allow =
+        "autoplay; fullscreen";
 
-      mediaBox.appendChild(video);
+      frame.setAttribute(
+        "allowfullscreen",
+        ""
+      );
+
+      mediaBox.appendChild(frame);
     } else {
       const image =
         document.createElement("img");
@@ -778,14 +955,18 @@ function renderGallery(memories) {
       details
     );
 
-    elements.galleryGrid.appendChild(card);
+    elements.galleryGrid.appendChild(
+      card
+    );
   });
 }
 
 function closeSuccessDialog() {
   elements.successDialog.hidden = true;
 
-  document.body.classList.remove("modal-open");
+  document.body.classList.remove(
+    "modal-open"
+  );
 
   elements.guestName.value = "";
 }
@@ -793,13 +974,17 @@ function closeSuccessDialog() {
 function openQrDialog() {
   elements.qrDialog.hidden = false;
 
-  document.body.classList.add("modal-open");
+  document.body.classList.add(
+    "modal-open"
+  );
 }
 
 function closeQrDialog() {
   elements.qrDialog.hidden = true;
 
-  document.body.classList.remove("modal-open");
+  document.body.classList.remove(
+    "modal-open"
+  );
 }
 
 function createQrCode() {
@@ -809,7 +994,9 @@ function createQrCode() {
   elements.qrWebsiteAddress.textContent =
     websiteUrl;
 
-  if (typeof QRCode === "undefined") {
+  if (
+    typeof QRCode === "undefined"
+  ) {
     window.setTimeout(
       createQrCode,
       300
@@ -823,21 +1010,11 @@ function createQrCode() {
   new QRCode(
     elements.qrCode,
     {
-      text:
-        websiteUrl,
-
-      width:
-        260,
-
-      height:
-        260,
-
-      colorDark:
-        "#51132e",
-
-      colorLight:
-        "#ffffff",
-
+      text: websiteUrl,
+      width: 260,
+      height: 260,
+      colorDark: "#51132e",
+      colorLight: "#ffffff",
       correctLevel:
         QRCode.CorrectLevel.H
     }
@@ -853,12 +1030,9 @@ async function shareWebsiteLink() {
       await navigator.share({
         title:
           "Theresa & Precious Wedding Memories",
-
         text:
           "Share and view memories from Theresa and Precious' wedding.",
-
-        url:
-          websiteUrl
+        url: websiteUrl
       });
 
       return;
@@ -872,17 +1046,21 @@ async function shareWebsiteLink() {
       "The wedding website link has been copied."
     );
   } catch (error) {
-    if (error.name !== "AbortError") {
+    if (
+      error.name !== "AbortError"
+    ) {
       showToast(
         "Copy this address: " +
-        websiteUrl
+          websiteUrl
       );
     }
   }
 }
 
 function getWebsiteUrl() {
-  return window.location.href.split("#")[0];
+  return window.location.href.split(
+    "#"
+  )[0];
 }
 
 function checkHeroImage() {
@@ -890,10 +1068,10 @@ function checkHeroImage() {
     "error",
     () => {
       elements.heroImage.alt =
-        "Add the approved wedding photo and name the file hero.jpg";
+        "Add the approved wedding photo inside assets/images and name it hero.jpg";
 
       showToast(
-        "The hero image is missing. Upload the photo and name it hero.jpg."
+        "The hero image is missing."
       );
     }
   );
@@ -906,11 +1084,17 @@ function handleEscapeKey(event) {
 
   if (!elements.qrDialog.hidden) {
     closeQrDialog();
-  } else if (!elements.successDialog.hidden) {
+  } else if (
+    !elements.successDialog.hidden
+  ) {
     closeSuccessDialog();
-  } else if (!elements.uploadDialog.hidden) {
+  } else if (
+    !elements.uploadDialog.hidden
+  ) {
     closeUploadDialog();
-  } else if (!elements.shareSheet.hidden) {
+  } else if (
+    !elements.shareSheet.hidden
+  ) {
     closeShareSheet();
   }
 }
@@ -921,7 +1105,9 @@ function beginGalleryRefresh() {
   state.galleryTimer =
     window.setInterval(
       () => {
-        if (!elements.galleryView.hidden) {
+        if (
+          !elements.galleryView.hidden
+        ) {
           loadGallery(false);
         }
       },
@@ -939,29 +1125,23 @@ function stopGalleryRefresh() {
   }
 }
 
-function clearSelectedFile() {
-  const fileIsInDemoGallery =
-    state.demoMemories.some(
-      (item) =>
-        item.url === state.selectedFileUrl
-    );
+function clearSelectedFiles() {
+  state.selectedFileUrls.forEach(
+    (url) => {
+      URL.revokeObjectURL(url);
+    }
+  );
 
-  if (
-    state.selectedFileUrl &&
-    !fileIsInDemoGallery
-  ) {
-    URL.revokeObjectURL(
-      state.selectedFileUrl
-    );
-  }
-
-  state.selectedFile = null;
-  state.selectedFileUrl = "";
+  state.selectedFiles = [];
+  state.selectedFileUrls = [];
 
   elements.previewArea.replaceChildren();
 
   elements.selectedFileDetails.textContent =
     "";
+
+  elements.confirmUpload.textContent =
+    "Add to the Album";
 }
 
 function convertFileToBase64(file) {
@@ -972,7 +1152,9 @@ function convertFileToBase64(file) {
 
       reader.onload = () => {
         const result =
-          String(reader.result || "");
+          String(
+            reader.result || ""
+          );
 
         const base64Value =
           result.includes(",")
@@ -1009,11 +1191,7 @@ function createSafeFileName(
       "_"
     );
 
-  return (
-    time +
-    "_" +
-    cleanName
-  );
+  return time + "_" + cleanName;
 }
 
 function updateProgress(
@@ -1055,7 +1233,11 @@ function formatMemoryDate(dateValue) {
   const date =
     new Date(dateValue);
 
-  if (Number.isNaN(date.getTime())) {
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
     return "Today";
   }
 
