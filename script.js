@@ -1,7 +1,7 @@
 "use strict";
 
 const GOOGLE_APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbwL3qk1XIilfLCuCt-6W2Bt2Ps4vKDG9ko3SDE1rtbLP9rReoEPf_A8iR-u40uJP1yx6g/exec";
+  "https://script.google.com/macros/s/AKfycbyfQldB_MEOO9dsEiRAr41q9LrYmOaF_Pp70-6YMMObWKfR-f08-Il94fxgZd5rRqrReQ/exec";
 
 const SETTINGS = {
   eventName: "Theresa & Precious",
